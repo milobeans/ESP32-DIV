@@ -24,4 +24,3 @@
 #define LOAD_FONT8
 #define LOAD_GFXFF
 #define SMOOTH_FONT
-

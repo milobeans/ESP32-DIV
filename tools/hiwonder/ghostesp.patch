@@ -112,6 +112,19 @@ index 0000000..4d0cc1c
 +esp_err_t hiwonder_board_set_backlight(bool on);
 +/* Active-high bits: KEY1=0, KEY2=1, KEY3=2, KEY4=3, BOOT=4. */
 +uint8_t hiwonder_board_read_keys(void);
+diff --git a/components/lvgl_esp32_drivers/lvgl_spi_conf.h b/components/lvgl_esp32_drivers/lvgl_spi_conf.h
+index 491c1f4..1d5eb65 100644
+--- a/components/lvgl_esp32_drivers/lvgl_spi_conf.h
++++ b/components/lvgl_esp32_drivers/lvgl_spi_conf.h
+@@ -172,7 +172,7 @@ extern "C" {
+ 
+ 
+ #if defined(CONFIG_LV_TFT_DISPLAY_CONTROLLER_ST7789)
+-  #if defined(CONFIG_USE_ENCODER)
++  #if defined(CONFIG_USE_ENCODER) || defined(CONFIG_HIWONDER_S3)
+     #define SPI_TFT_SPI_MODE (0)
+   #else
+     #define SPI_TFT_SPI_MODE (2)
 diff --git a/components/lvgl_esp32_drivers/lvgl_tft/st7789.c b/components/lvgl_esp32_drivers/lvgl_tft/st7789.c
 index 39510ea..f7690b2 100644
 --- a/components/lvgl_esp32_drivers/lvgl_tft/st7789.c
@@ -3364,7 +3377,7 @@ index 061c7b1..1167932 100644
  
    ESP_LOGI(TAG, "sd_card_init: starting, free internal RAM: %d bytes", 
 diff --git a/main/managers/settings_manager.c b/main/managers/settings_manager.c
-index 9cfd79c..cfd1ba2 100644
+index 9cfd79c..b9005bd 100644
 --- a/main/managers/settings_manager.c
 +++ b/main/managers/settings_manager.c
 @@ -16,7 +16,9 @@
@@ -3394,7 +3407,20 @@ index 9cfd79c..cfd1ba2 100644
      printf("Settings loaded successfully.\n");
      settings_print_nvs_stats();
    } else {
-@@ -2096,7 +2107,11 @@ void settings_set_auto_save_scans(FSettings *settings, bool enabled) {
+@@ -293,6 +304,12 @@ void settings_set_defaults(FSettings *settings) {
+   settings->menu_item_borders = false;
+   settings->menu_card_bg = false;
+   settings->touch_drag_scroll = true;
++#ifdef CONFIG_HIWONDER_S3
++  // Keep the same idle defaults if NVS cannot be opened at first boot.
++  settings->ap_enabled = false;
++  settings->wifi_auto_reconnect = false;
++  settings->auto_save_scans = false;
++#endif
+ 
+   // Wardriving defaults
+   settings->wd_hop_primary_ms = 125;
+@@ -2096,7 +2113,11 @@ void settings_set_auto_save_scans(FSettings *settings, bool enabled) {
  }
  
  bool settings_get_auto_save_scans(const FSettings *settings) {
@@ -3406,7 +3432,7 @@ index 9cfd79c..cfd1ba2 100644
  }
  
  // Menu layout settings
-@@ -2156,7 +2171,11 @@ void settings_set_wigle_auto_upload(FSettings *settings, bool enabled) {
+@@ -2156,7 +2177,11 @@ void settings_set_wigle_auto_upload(FSettings *settings, bool enabled) {
  }
  
  bool settings_get_wigle_auto_upload(const FSettings *settings) {

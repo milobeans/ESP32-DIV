@@ -877,7 +877,11 @@ void spooferSetup() {
 
   tft.drawFastHLine(0, 19, 240, UI_LINE);
 
+#if defined(BOARD_HIWONDER_ESP32_S3)
+  randomSeed(esp_random());  // Do not switch BOOT GPIO0 to an unverified ADC input.
+#else
   randomSeed(analogRead(0));
+#endif
   setupTouchscreen();
 
   tft.setTextFont(1);

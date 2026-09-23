@@ -1508,7 +1508,11 @@ void runUI() {
 }
 
 void scrollAddress(uint16_t vsp) {
+#if defined(BOARD_HIWONDER_ESP32_S3)
+  tft.writecommand(ST7789_VSCRSADD);
+#else
   tft.writecommand(ILI9341_VSCRSADD);
+#endif
   tft.writedata(vsp >> 8);
   tft.writedata(vsp);
 }
@@ -1528,7 +1532,11 @@ int scroll_line() {
 }
 
 void setupScrollArea(uint16_t tfa, uint16_t bfa) {
+#if defined(BOARD_HIWONDER_ESP32_S3)
+  tft.writecommand(ST7789_VSCRDEF);
+#else
   tft.writecommand(ILI9341_VSCRDEF);
+#endif
   tft.writedata(tfa >> 8);
   tft.writedata(tfa);
   tft.writedata((DISPLAY_HEIGHT - tfa - bfa) >> 8);
