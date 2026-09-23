@@ -120,14 +120,37 @@ int main(int argc, char** argv) {
     int16_t x, y;
     assert(!HiwonderBoard::beginTouch() && !HiwonderBoard::readTouch(x, y));
     assert(Wire.readCalls == 0 && Wire.writes.empty());
+    assert(Wire.beginCalls == 3 && Wire.endCalls == 2);
   } else if (std::strcmp(scenario, "touch-unknown-id") == 0) {
     Wire.registers[0xA8] = 0x7F;
     int16_t x, y;
     assert(!HiwonderBoard::beginTouch() && !HiwonderBoard::readTouch(x, y));
+    assert(Wire.beginCalls == 1);
   } else if (std::strcmp(scenario, "touch-short-id") == 0) {
     Wire.registers[0xA8] = 0x64;
     Wire.shortRead = true;
     assert(!HiwonderBoard::beginTouch());
+    assert(Wire.beginCalls == 3 && Wire.endCalls == 2);
+  } else if (std::strcmp(scenario, "touch-transient-nack") == 0) {
+    Wire.registers[0xA8] = 0x64;
+    Wire.probeFailures = 1;
+    assert(HiwonderBoard::beginTouch());
+    assert(Wire.beginCalls == 2 && Wire.endCalls == 1);
+    assert(Wire.beginFrequencies[0] == 400000 && Wire.beginFrequencies[1] == 100000);
+    assert(Wire1.beginCalls == 0 && Wire1.writes.empty());
+    int16_t x, y;
+    touch(0, 0);
+    assert(HiwonderBoard::readTouch(x, y) && x == 239 && y == 319);
+  } else if (std::strcmp(scenario, "touch-transient-short-read") == 0) {
+    Wire.registers[0xA8] = 0x11;
+    Wire.shortReadsRemaining = 1;
+    assert(HiwonderBoard::beginTouch() && Wire.beginCalls == 2);
+    assert(Wire1.beginCalls == 0 && Wire1.writes.empty());
+  } else if (std::strcmp(scenario, "touch-persistent-nack") == 0) {
+    Wire.nack = true;
+    assert(!HiwonderBoard::beginTouch());
+    assert(Wire.beginCalls == 3 && Wire.endCalls == 2 && Wire.readCalls == 0);
+    assert(!HiwonderBoard::beginTouch() && Wire.beginCalls == 3);
   } else assert(false && "unknown fixture scenario");
   std::cout << "PASS " << scenario << '\n';
 }

@@ -11,6 +11,6 @@ trap 'rm -rf "$build_dir"' EXIT HUP INT TERM
   -I"$check_dir/include" -I"$source_dir" \
   "$check_dir/driver_check.cpp" "$source_dir/HiwonderBoard.cpp" \
   -o "$build_dir/driver_check"
-for scenario in success expander-begin-failure expander-nack touch-begin-failure touch-unknown-id touch-short-id; do
+for scenario in success expander-begin-failure expander-nack touch-begin-failure touch-unknown-id touch-short-id touch-transient-nack touch-transient-short-read touch-persistent-nack; do
   "$build_dir/driver_check" "$scenario"
 done
