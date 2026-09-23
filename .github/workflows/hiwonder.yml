@@ -1,12 +1,17 @@
 name: Hiwonder firmware
 on:
-  push:
-    branches: [hiwonder-esp32-s3]
   workflow_dispatch:
+    inputs:
+      target:
+        description: Firmware to build
+        type: choice
+        default: both
+        options: [both, esp32-div, ghostesp]
 permissions:
   contents: read
 jobs:
   esp32-div:
+    if: inputs.target != 'ghostesp'
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
@@ -28,6 +33,7 @@ jobs:
           path: artifacts/
           if-no-files-found: error
   ghostesp:
+    if: inputs.target != 'esp32-div'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:

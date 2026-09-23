@@ -1509,7 +1509,8 @@ void runUI() {
 
 void scrollAddress(uint16_t vsp) {
 #if defined(BOARD_HIWONDER_ESP32_S3)
-  tft.writecommand(ST7789_VSCRSADD);
+  // VSCRSADD is 0x37; TFT_eSPI's minimal ST7789_2 header omits its name.
+  tft.writecommand(0x37);
 #else
   tft.writecommand(ILI9341_VSCRSADD);
 #endif
