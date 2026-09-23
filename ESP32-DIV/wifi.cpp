@@ -4187,6 +4187,13 @@ void cportalLoop() {
   updateStatusBar();
   runUI();
 
+  // Touch can request exit during runUI. Finish teardown in this same call;
+  // the launcher stops dispatching this loop as soon as the flag is raised.
+  if (feature_exit_requested) {
+    cportalTeardown();
+    return;
+  }
+
   if (attackActive) {
     dnsServer.processNextRequest();
     server.handleClient();

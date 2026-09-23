@@ -119,18 +119,38 @@ void configurePanel() {
 bool beginTouch() {
   if (touchAttempted) return touchReady;
   touchAttempted = true;
-  if (Wire.begin(HIWONDER_TOUCH_SDA, HIWONDER_TOUCH_SCL, 400000)) {
-    Wire.setTimeOut(25);
-    // Touch reset is not specified by the vendor; allow its power-on reset.
-    delay(120);
-    uint8_t id = 0;
-    if (readRegisters(Wire, kTouchAddress, 0xA8, &id, 1)) {
-      touchReady = id == 0x11 || id == 0x64;
-      Serial.printf("[Hiwonder] FT6336 0x38 on 4/5: ID 0x%02X, %s\n",
-                    id, touchReady ? "ready" : "unrecognized");
+  // A reset or transient failed transfer must not disable touch after just one
+  // probe. Retry only this board-owned bus, never guessed reset/interrupt GPIOs.
+  constexpr uint32_t clocks[] = {400000, 100000, 100000};
+  for (uint8_t attempt = 0; attempt < 3; ++attempt) {
+    if (attempt != 0) Wire.end();
+    Serial.printf("[Hiwonder] Touch probe %u/3: I2C0 SDA4/SCL5, %lu Hz\n",
+                  unsigned(attempt + 1), (unsigned long)clocks[attempt]);
+    if (!Wire.begin(HIWONDER_TOUCH_SDA, HIWONDER_TOUCH_SCL, clocks[attempt])) {
+      Serial.println("[Hiwonder] Touch I2C master initialization failed");
+      continue;
     }
+    Wire.setTimeOut(25);
+    // No valid touch reset GPIO is supplied by the vendor BSP.
+    delay(120);
+    Wire.beginTransmission(kTouchAddress);
+    const uint8_t ack = Wire.endTransmission();
+    if (ack != 0) {
+      Serial.printf("[Hiwonder] Touch 0x38 address probe failed, Wire status=%u\n", ack);
+      continue;
+    }
+    uint8_t id = 0;
+    if (!readRegisters(Wire, kTouchAddress, 0xA8, &id, 1)) {
+      Serial.println("[Hiwonder] Touch 0x38 ACKed, but register 0xA8 read failed");
+      continue;
+    }
+    touchReady = id == 0x11 || id == 0x64;
+    Serial.printf("[Hiwonder] FT6336 register 0xA8=0x%02X: %s\n",
+                  id, touchReady ? "ready" : "unrecognized; touch disabled");
+    // A responding but unrecognized device is not a transient bus failure.
+    break;
   }
-  if (!touchReady) Serial.println("[Hiwonder] Touch unavailable; use KEY1..KEY4");
+  if (!touchReady) Serial.println("[Hiwonder] Touch unavailable after bounded probe; use KEY1..KEY4");
   return touchReady;
 }
 
