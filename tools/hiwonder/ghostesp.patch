@@ -1,3 +1,31 @@
+diff --git a/components/io_manager/i2c_shared.c b/components/io_manager/i2c_shared.c
+index 625dc4a..57832e4 100644
+--- a/components/io_manager/i2c_shared.c
++++ b/components/io_manager/i2c_shared.c
+@@ -1,3 +1,4 @@
++#include "sdkconfig.h"
+ #include "i2c_shared.h"
+ #include "i2c_bus_lock.h"
+ #include <esp_log.h>
+@@ -99,6 +100,10 @@ esp_err_t i2c_shared_get_or_create_bus(i2c_port_num_t port,
+         goto out;
+     }
+ 
++    /* Hiwonder owns both controllers through this registry. Probing IDF
++     * before the first creation logs an error for an expected missing bus.
++     * Other boards still discover buses initialized by their BSPs here. */
++#ifndef CONFIG_HIWONDER_S3
+     ret = i2c_master_get_bus_handle(port, out_bus);
+     if (ret == ESP_OK) {
+         s_bus_handles[port] = *out_bus;
+@@ -108,6 +113,7 @@ esp_err_t i2c_shared_get_or_create_bus(i2c_port_num_t port,
+         ESP_LOGE(TAG, "i2c_master_get_bus_handle port %d failed: %s", (int)port, esp_err_to_name(ret));
+         goto out;
+     }
++#endif
+ 
+     ESP_LOGI(TAG, "Creating I2C master bus on port %d (SDA=%d, SCL=%d, pullup=%d)",
+              (int)port, (int)sda, (int)scl, enable_internal_pullup);
 diff --git a/components/lvgl_esp32_drivers/hiwonder_board.c b/components/lvgl_esp32_drivers/hiwonder_board.c
 new file mode 100644
 index 0000000..c0d3034
@@ -3166,7 +3194,7 @@ index ea77cfe..45213b5 100644
          string "Specify template used to build"
          default "unknown_board"
 diff --git a/main/core/serial_manager.c b/main/core/serial_manager.c
-index 9bdb931..6612969 100644
+index 9bdb931..ace408a 100644
 --- a/main/core/serial_manager.c
 +++ b/main/core/serial_manager.c
 @@ -73,6 +73,9 @@ static bool s_uart_disabled = false; // disable main serial UART for certain tem
@@ -3179,6 +3207,199 @@ index 9bdb931..6612969 100644
    return false;
  }
  
+@@ -415,19 +418,13 @@ static void move_cursor_to_position(int new_pos) {
+         // Move right - send right arrow sequences
+         for (int i = 0; i < move_count; i++) {
+             const char right_arrow[] = "\033[C";
+-            uart_write_bytes(UART_NUM, right_arrow, 3);
+-#if JTAG_SUPPORTED
+-            usb_serial_jtag_write_bytes((const uint8_t*)right_arrow, 3, 0);
+-#endif
++            serial_manager_write_bytes(right_arrow, 3);
+         }
+     } else if (move_count < 0) {
+         // Move left - send left arrow sequences
+         for (int i = 0; i < -move_count; i++) {
+             const char left_arrow[] = "\033[D";
+-            uart_write_bytes(UART_NUM, left_arrow, 3);
+-#if JTAG_SUPPORTED
+-            usb_serial_jtag_write_bytes((const uint8_t*)left_arrow, 3, 0);
+-#endif
++            serial_manager_write_bytes(left_arrow, 3);
+         }
+     }
+ }
+@@ -446,26 +443,17 @@ static void insert_character_at_cursor(char c) {
+     serial_buffer[len + 1] = '\0';
+     
+     // Display the character and move cursor right
+-    uart_write_bytes(UART_NUM, &c, 1);
+-#if JTAG_SUPPORTED
+-    usb_serial_jtag_write_bytes((const uint8_t*)&c, 1, 0);
+-#endif
++    serial_manager_write_bytes(&c, 1);
+     
+     // Display remaining characters
+     for (int i = cursor_position + 1; i <= len; i++) {
+-        uart_write_bytes(UART_NUM, &serial_buffer[i], 1);
+-#if JTAG_SUPPORTED
+-        usb_serial_jtag_write_bytes((const uint8_t*)&serial_buffer[i], 1, 0);
+-#endif
++        serial_manager_write_bytes(&serial_buffer[i], 1);
+     }
+     
+     // Move cursor back to correct position
+     for (int i = len; i > cursor_position; i--) {
+         const char left_arrow[] = "\033[D";
+-        uart_write_bytes(UART_NUM, left_arrow, 3);
+-#if JTAG_SUPPORTED
+-        usb_serial_jtag_write_bytes((const uint8_t*)left_arrow, 3, 0);
+-#endif
++        serial_manager_write_bytes(left_arrow, 3);
+     }
+     
+     cursor_position++;
+@@ -485,26 +473,17 @@ static void delete_character_at_cursor(void) {
+ 
+     // Display remaining characters (overwrite current position)
+     for (int i = cursor_position; i < new_len; i++) {
+-        uart_write_bytes(UART_NUM, &serial_buffer[i], 1);
+-#if JTAG_SUPPORTED
+-        usb_serial_jtag_write_bytes((const uint8_t*)&serial_buffer[i], 1, 0);
+-#endif
++        serial_manager_write_bytes(&serial_buffer[i], 1);
+     }
+     
+     // Clear the last character
+     const char space[] = " ";
+-    uart_write_bytes(UART_NUM, space, 1);
+-#if JTAG_SUPPORTED
+-    usb_serial_jtag_write_bytes((const uint8_t*)space, 1, 0);
+-#endif
++    serial_manager_write_bytes(space, 1);
+     
+     // Move cursor back to correct position
+     for (int i = len - cursor_position; i > 0; i--) {
+         const char left_arrow[] = "\033[D";
+-        uart_write_bytes(UART_NUM, left_arrow, 3);
+-#if JTAG_SUPPORTED
+-        usb_serial_jtag_write_bytes((const uint8_t*)left_arrow, 3, 0);
+-#endif
++        serial_manager_write_bytes(left_arrow, 3);
+     }
+ }
+ 
+@@ -514,10 +493,7 @@ static void backspace_at_cursor(void) {
+     
+     // Move cursor left first
+     const char left_arrow[] = "\033[D";
+-    uart_write_bytes(UART_NUM, left_arrow, 3);
+-#if JTAG_SUPPORTED
+-    usb_serial_jtag_write_bytes((const uint8_t*)left_arrow, 3, 0);
+-#endif
++    serial_manager_write_bytes(left_arrow, 3);
+     
+     // Shift characters to the left (delete character at cursor_position - 1)
+     for (int i = cursor_position - 1; i < len; i++) {
+@@ -529,25 +505,16 @@ static void backspace_at_cursor(void) {
+ 
+     // Display remaining characters from cursor position
+     for (int i = cursor_position - 1; i < new_len; i++) {
+-        uart_write_bytes(UART_NUM, &serial_buffer[i], 1);
+-#if JTAG_SUPPORTED
+-        usb_serial_jtag_write_bytes((const uint8_t*)&serial_buffer[i], 1, 0);
+-#endif
++        serial_manager_write_bytes(&serial_buffer[i], 1);
+     }
+     
+     // Clear the last character
+     const char space[] = " ";
+-    uart_write_bytes(UART_NUM, space, 1);
+-#if JTAG_SUPPORTED
+-    usb_serial_jtag_write_bytes((const uint8_t*)space, 1, 0);
+-#endif
++    serial_manager_write_bytes(space, 1);
+     
+     // Move cursor back to correct position
+     for (int i = len - cursor_position + 1; i > 0; i--) {
+-        uart_write_bytes(UART_NUM, left_arrow, 3);
+-#if JTAG_SUPPORTED
+-        usb_serial_jtag_write_bytes((const uint8_t*)left_arrow, 3, 0);
+-#endif
++        serial_manager_write_bytes(left_arrow, 3);
+     }
+     
+     cursor_position--;
+@@ -557,10 +524,7 @@ static void clear_line_from_cursor(void) {
+     // Use ANSI escape to clear from cursor to end of line to avoid
+     // backspace-based visual corruption when replacing the line.
+     const char clear_to_eol[] = "\033[K";
+-    uart_write_bytes(UART_NUM, clear_to_eol, 3);
+-#if JTAG_SUPPORTED
+-    usb_serial_jtag_write_bytes((const uint8_t*)clear_to_eol, 3, 0);
+-#endif
++    serial_manager_write_bytes(clear_to_eol, 3);
+     // Truncate buffer at cursor position
+     serial_buffer[cursor_position] = '\0';
+ }
+@@ -568,16 +532,10 @@ static void clear_line_from_cursor(void) {
+ static void clear_entire_line(void) {
+     // Move cursor to beginning of line
+     const char cr[] = "\r";
+-    uart_write_bytes(UART_NUM, cr, 1);
+-#if JTAG_SUPPORTED
+-    usb_serial_jtag_write_bytes((const uint8_t*)cr, 1, 0);
+-#endif
++    serial_manager_write_bytes(cr, 1);
+     // Clear entire line using ANSI escape sequence
+     const char clear_line[] = "\033[2K";
+-    uart_write_bytes(UART_NUM, clear_line, 4);
+-#if JTAG_SUPPORTED
+-    usb_serial_jtag_write_bytes((const uint8_t*)clear_line, 4, 0);
+-#endif
++    serial_manager_write_bytes(clear_line, 4);
+ }
+ 
+ static void display_prompt(void) {
+@@ -802,10 +760,7 @@ void serial_task(void *pvParameter) {
+               cursor_position = index; // Move cursor to end
+               // Echo the history command
+               if (index > 0) {
+-                uart_write_bytes(UART_NUM, history_cmd, index);
+-#if JTAG_SUPPORTED
+-                usb_serial_jtag_write_bytes((const uint8_t*)history_cmd, index, 0);
+-#endif
++                serial_manager_write_bytes(history_cmd, index);
+               }
+             }
+           } else if (incoming_char == 'B') { // Down arrow
+@@ -830,10 +785,7 @@ void serial_task(void *pvParameter) {
+               cursor_position = index; // Move cursor to end
+               // Echo the history command
+               if (index > 0) {
+-                uart_write_bytes(UART_NUM, history_cmd, index);
+-#if JTAG_SUPPORTED
+-                usb_serial_jtag_write_bytes((const uint8_t*)history_cmd, index, 0);
+-#endif
++                serial_manager_write_bytes(history_cmd, index);
+               }
+             } else {
+               // No more history, clear buffer
+@@ -882,12 +834,9 @@ void serial_task(void *pvParameter) {
+             output_deferred = false;
+           }
+           
+-          // Echo newline directly to UART
++          // Echo newline to the enabled console transports
+           const char newline[] = "\n";
+-          if (!s_uart_disabled && !s_uart_paused) uart_write_bytes(UART_NUM, newline, 1);
+-#if JTAG_SUPPORTED
+-          usb_serial_jtag_write_bytes((const uint8_t*)newline, 1, 0);
+-#endif
++          serial_manager_write_bytes(newline, 1);
+           serial_buffer[index] = '\0';
+           if (index > 0) {
+             // Reset history display index when entering a new command
 diff --git a/main/main.c b/main/main.c
 index e1e2035..14503e7 100644
 --- a/main/main.c
@@ -3240,7 +3461,7 @@ index e1e2035..14503e7 100644
      printf("Build Name: %s\n", CONFIG_BUILD_CONFIG_TEMPLATE);
      
 diff --git a/main/managers/display_manager.c b/main/managers/display_manager.c
-index b99638a..d0b08de 100644
+index b99638a..14fcdf3 100644
 --- a/main/managers/display_manager.c
 +++ b/main/managers/display_manager.c
 @@ -7,6 +7,9 @@
@@ -3253,7 +3474,23 @@ index b99638a..d0b08de 100644
  #ifdef CONFIG_USE_C5_PARLIO_DISPLAY
  #include "lvgl_tft/banshee_c5_parlio.h"
  #endif
-@@ -1593,6 +1596,11 @@ void display_manager_init(void) {
+@@ -1504,6 +1507,7 @@ void display_manager_restore_status_bar(void) {
+ }
+ 
+ void apply_power_management_config(bool power_save_enabled) {
++#ifdef CONFIG_PM_ENABLE
+   esp_pm_config_t pm_cfg = {
+       .max_freq_mhz = power_save_enabled ? 160 : CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ,
+       .min_freq_mhz = power_save_enabled ? 80 : CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ,
+@@ -1519,6 +1523,7 @@ void apply_power_management_config(bool power_save_enabled) {
+     ESP_LOGW(TAG, "pm configure failed: %s", esp_err_to_name(pm_err));
+   }
+   rgb_manager_power_transition_end();
++#endif
+ 
+ #if defined(CONFIG_LV_DISP_BACKLIGHT_PWM) && !defined(CONFIG_IS_ATOMS3R)
+   // Reconfigure LEDC timer after power management changes to maintain stable PWM
+@@ -1593,6 +1598,11 @@ void display_manager_init(void) {
      lvgl_lock_registered = true;
    }
  
@@ -3265,7 +3502,23 @@ index b99638a..d0b08de 100644
  #ifdef CONFIG_Waveshare_LCD
    static bool ch422g_initialized = false;
    if (!ch422g_initialized) {
-@@ -3414,7 +3422,11 @@ static void display_manager_set_backlight_raw(uint8_t percentage) {
+@@ -1601,6 +1611,7 @@ void display_manager_init(void) {
+   }
+ #endif
+ 
++#ifdef CONFIG_PM_ENABLE
+   ESP_LOGI(TAG, "display_manager: configuring power management...");
+   esp_pm_config_t pm_cfg = {
+     .max_freq_mhz = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ,
+@@ -1613,6 +1624,7 @@ void display_manager_init(void) {
+   }
+   ESP_LOGI(TAG, "display_manager: power management configured, free internal RAM: %d bytes", 
+            (int)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
++#endif
+ 
+   apply_power_management_config(settings_get_power_save_enabled(&G_Settings));
+ 
+@@ -3414,7 +3426,11 @@ static void display_manager_set_backlight_raw(uint8_t percentage) {
      percentage = (percentage * max_brightness) / 100;
      if (percentage > 100) percentage = 100;
  
@@ -3278,7 +3531,7 @@ index b99638a..d0b08de 100644
      // TDisplay S3 backlight now uses LEDC for PWM control
      uint32_t duty = (percentage * ((1 << LEDC_TIMER_10_BIT) - 1)) / 100;
      ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty);
-@@ -3704,6 +3716,72 @@ static void encoder_poll_task(void *pvParameters)
+@@ -3704,6 +3720,72 @@ static void encoder_poll_task(void *pvParameters)
  }
  #endif
  
@@ -3351,7 +3604,7 @@ index b99638a..d0b08de 100644
  void hardware_input_task(void *pvParameters) {
  #ifdef CONFIG_USE_C5_PARLIO_DISPLAY
    const TickType_t tick_interval = pdMS_TO_TICKS(5);
-@@ -3756,6 +3834,9 @@ void hardware_input_task(void *pvParameters) {
+@@ -3756,6 +3838,9 @@ void hardware_input_task(void *pvParameters) {
        }
        s_input_gate_parked = false;
      }
