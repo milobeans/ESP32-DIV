@@ -32,5 +32,6 @@ FLAGS="-DBOARD_HIWONDER_ESP32_S3=1 -include $ROOT/tools/hiwonder/hiwonder_tft.h"
   --libraries "$ROOT/.libraries" --build-path "$ROOT/.build" \
   --build-property "compiler.cpp.extra_flags=$FLAGS" \
   --build-property "compiler.c.extra_flags=$FLAGS" \
+  --build-property 'compiler.c.elf.extra_flags=-Wl,--allow-multiple-definition' \
   --export-binaries ESP32-DIV
 python3 tools/hiwonder/merge-div.py
