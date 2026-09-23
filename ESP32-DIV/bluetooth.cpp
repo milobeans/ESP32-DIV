@@ -3119,6 +3119,9 @@ void exit() {
 }  // namespace BleSkimmer
 
 
+#if defined(BOARD_HIWONDER_ESP32_S3)
+namespace BleJammer { void blejamSetup() { feature_exit_requested = true; } void blejamLoop() {} void exit() {} }
+#else
 namespace BleJammer {
 
 RF24 radio1(CE_PIN_1, CSN_PIN_1, 16000000);
@@ -3404,6 +3407,8 @@ void exit() {
   restoreSdAfterSharedSpi();
 }
 }
+#endif
+
 
 namespace BleSniffer { void exit(); }
 
@@ -4029,6 +4034,9 @@ void exit() {
 }
 }
 
+#if defined(BOARD_HIWONDER_ESP32_S3)
+namespace Scanner { void scannerSetup() { feature_exit_requested = true; } void scannerLoop() {} void exit() {} }
+#else
 namespace Scanner {
 
 #define CE  NRF24_SCAN_CE
@@ -4992,8 +5000,13 @@ void exit() {
   restoreSdAfterSharedSpi();
 }
 
-}  // namespace Scanner
+}
+#endif
+  // namespace Scanner
 
+#if defined(BOARD_HIWONDER_ESP32_S3)
+namespace ProtoKill { void prokillSetup() { feature_exit_requested = true; } void prokillLoop() {} void exit() {} }
+#else
 namespace ProtoKill {
 
 RF24 radio1(CE_PIN_1, CSN_PIN_1, 16000000);
@@ -5365,7 +5378,9 @@ void exit() {
   restoreSdAfterSharedSpi();
 }
 
-}  // namespace ProtoKill
+}
+#endif
+  // namespace ProtoKill
 
 // Shared MouseJack targets: scanner publishes, inject consumes.
 static constexpr int kMjSharedMax = 12;
@@ -5421,6 +5436,9 @@ static int mjSharedCount() {
   return n;
 }
 
+#if defined(BOARD_HIWONDER_ESP32_S3)
+namespace EsbSniffer { void esbSnifferSetup() { feature_exit_requested = true; } void esbSnifferLoop() {} void exit() {} }
+#else
 namespace EsbSniffer {
 
 #define CE  NRF24_SCAN_CE
@@ -6281,8 +6299,13 @@ void exit() {
   restoreSdAfterSharedSpi();
 }
 
-}  // namespace EsbSniffer
+}
+#endif
+  // namespace EsbSniffer
 
+#if defined(BOARD_HIWONDER_ESP32_S3)
+namespace EsbReplay { void esbReplaySetup() { feature_exit_requested = true; } void esbReplayLoop() {} void exit() {} }
+#else
 namespace EsbReplay {
 
 #define CE  NRF24_SCAN_CE
@@ -7118,8 +7141,13 @@ void exit() {
   restoreSdAfterSharedSpi();
 }
 
-}  // namespace EsbReplay
+}
+#endif
+  // namespace EsbReplay
 
+#if defined(BOARD_HIWONDER_ESP32_S3)
+namespace MouseJack { void mouseJackSetup() { feature_exit_requested = true; } void mouseJackLoop() {} void exit() {} }
+#else
 namespace MouseJack {
 
 #define CE  NRF24_SCAN_CE
@@ -8003,8 +8031,13 @@ void exit() {
   restoreSdAfterSharedSpi();
 }
 
-}  // namespace MouseJack
+}
+#endif
+  // namespace MouseJack
 
+#if defined(BOARD_HIWONDER_ESP32_S3)
+namespace MouseJackInject { void mouseJackInjectSetup() { feature_exit_requested = true; } void mouseJackInjectLoop() {} void exit() {} }
+#else
 namespace MouseJackInject {
 
 #define CE  NRF24_SCAN_CE
@@ -8868,7 +8901,9 @@ void exit() {
   restoreSdAfterSharedSpi();
 }
 
-}  // namespace MouseJackInject
+}
+#endif
+  // namespace MouseJackInject
 
 namespace BleSniffer {
 

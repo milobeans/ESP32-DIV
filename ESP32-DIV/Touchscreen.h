@@ -1,13 +1,18 @@
 #ifndef TOUCHSCREEN_H
 #define TOUCHSCREEN_H
 
+#include "BoardConfig.h"
+#if !defined(BOARD_HIWONDER_ESP32_S3)
 #include <SPI.h>
 #include <XPT2046_Touchscreen.h>
+#endif
 #include "SettingsStore.h"
 #include "shared.h"
 
+#if !defined(BOARD_HIWONDER_ESP32_S3)
 extern SPIClass touchscreenSPI;
 extern XPT2046_Touchscreen ts;
+#endif
 
 #ifndef TOUCH_X_MIN
 #define TOUCH_X_MIN 300

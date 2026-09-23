@@ -1,3 +1,12 @@
+#include "BoardConfig.h"
+#if defined(BOARD_HIWONDER_ESP32_S3)
+#include "shared.h"
+namespace replayat { void ReplayAttackSetup() { feature_exit_requested = true; } void ReplayAttackLoop() {} }
+namespace SavedProfile { void saveSetup() { feature_exit_requested = true; } void saveLoop() {} }
+namespace subjammer { void subjammerSetup() { feature_exit_requested = true; } void subjammerLoop() {} }
+namespace SubBrute { void subBruteSetup() { feature_exit_requested = true; } void subBruteLoop() {} }
+namespace jammingdetector { void Setup() { feature_exit_requested = true; } void Loop() {} }
+#else
 #include <algorithm>
 #include <vector>
 #include "KeyboardUI.h"
@@ -4277,3 +4286,5 @@ void Loop() {
 }
 
 }  // namespace jammingdetector
+
+#endif

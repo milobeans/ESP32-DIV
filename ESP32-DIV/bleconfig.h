@@ -2,7 +2,7 @@
 #define BLECONFIG_H
 
 #include <Arduino.h>
-#include <PCF8574.h>
+#include "BoardButtons.h"
 #include <RF24.h>
 #include <SPI.h>
 #include <TFT_eSPI.h>
@@ -18,7 +18,7 @@
 #include "utils.h"
 
 extern TFT_eSPI tft;
-extern PCF8574 pcf;
+extern BoardButtonExpander pcf;
 
 namespace BleJammer {
 void blejamSetup();

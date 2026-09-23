@@ -4,7 +4,7 @@
 #include <DNSServer.h>
 #include <EEPROM.h>
 #include <ESPmDNS.h>
-#include <PCF8574.h>
+#include "BoardButtons.h"
 #include <Preferences.h>
 #include <SD.h>
 #include <TFT_eSPI.h>
@@ -30,7 +30,7 @@
 #include "utils.h"
 
 extern TFT_eSPI tft;
-extern PCF8574 pcf;
+extern BoardButtonExpander pcf;
 
 using namespace std;
 

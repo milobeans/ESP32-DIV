@@ -1,3 +1,15 @@
+#include "BoardConfig.h"
+#if defined(BOARD_HIWONDER_ESP32_S3)
+#include "shared.h"
+namespace GpsSatelliteScanner { void session() { feature_exit_requested = true; } }
+namespace GpsWardriver {
+void session() { feature_exit_requested = true; }
+void stopBackgroundIfRunning() {}
+bool statusBarGpsIconActive() { return false; }
+void clearSessionRetry() {}
+bool consumeSessionRetry() { return false; }
+}
+#else
 #include <Arduino.h>
 #include <HardwareSerial.h>
 #include <TFT_eSPI.h>
@@ -4033,3 +4045,5 @@ bool consumeSessionRetry() {
 }
 
 }
+
+#endif

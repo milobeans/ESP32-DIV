@@ -1,3 +1,10 @@
+#include "BoardConfig.h"
+#if defined(BOARD_HIWONDER_ESP32_S3)
+#include "shared.h"
+namespace IRRemoteFeature { void setup() { feature_exit_requested = true; } void loop() {} }
+namespace IRSavedProfile { void setup() { feature_exit_requested = true; } void loop() {} }
+namespace IRUniversalController { void setup() { feature_exit_requested = true; } void loop() {} }
+#else
 #include <Arduino.h>
 #include <IRrecv.h>
 #include <IRremoteESP8266.h>
@@ -3149,3 +3156,5 @@ void loop() {
   delay(10);
   }
 }
+
+#endif

@@ -1,3 +1,23 @@
+#include "BoardConfig.h"
+#if defined(BOARD_HIWONDER_ESP32_S3)
+#include "HiwonderBoard.h"
+#include "Touchscreen.h"
+
+bool feature_active = false;
+void setupTouchscreen() { HiwonderBoard::beginTouch(); }
+bool readTouchRawXY(int16_t& x, int16_t& y, uint16_t) {
+  return HiwonderBoard::readTouch(x, y);
+}
+bool isTouchDown(uint16_t) { int16_t x, y; return HiwonderBoard::readTouch(x, y); }
+bool isTouchDownDismiss(uint16_t z) { return isTouchDown(z); }
+bool readTouchXY(int& x, int& y) {
+  int16_t px, py;
+  if (!HiwonderBoard::readTouch(px, py)) return false;
+  x = px; y = py;
+  return true;
+}
+bool readTouchXYDismiss(int& x, int& y) { return readTouchXY(x, y); }
+#else
 #include "SettingsStore.h"
 #include "Touchscreen.h"
 #include <TFT_eSPI.h>
@@ -153,3 +173,5 @@ bool readTouchXYDismiss(int& x, int& y) {
   mapTouchToScreen(rawX, rawY, x, y);
   return true;
 }
+
+#endif

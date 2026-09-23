@@ -4,7 +4,7 @@
 /* ───────────── Common includes ───────────── */
 #include <Arduino.h>
 #include <TFT_eSPI.h>
-#include <PCF8574.h>
+#include "BoardButtons.h"
 #include <XPT2046_Touchscreen.h>
 #include <SPI.h>
 #include <Wire.h>
@@ -12,12 +12,16 @@
 #include <Preferences.h>
 #include <WebServer.h>
 #include <DNSServer.h>
+#if !defined(BOARD_HIWONDER_ESP32_S3)
 #include <RCSwitch.h>
+#endif
 #include <SD.h>
 #include <Update.h>
 #include <ESPmDNS.h>
+#if !defined(BOARD_HIWONDER_ESP32_S3)
 #include <nRF24L01.h>
 #include <RF24.h>
+#endif
 #include <WiFi.h>
 #include <esp_wifi.h>
 #include <esp_wifi_types.h>
@@ -35,7 +39,9 @@
 #include "esp_gap_bt_api.h"
 
 #include "arduinoFFT.h"
+#if !defined(BOARD_HIWONDER_ESP32_S3)
 #include "ELECHOUSE_CC1101_SRC_DRV.h"
+#endif
 #include "utils.h"
 #include "shared.h"
 
@@ -43,7 +49,7 @@ using namespace std;
 
 /* ───────────── Common externs ───────────── */
 extern TFT_eSPI tft;
-extern PCF8574 pcf;
+extern BoardButtonExpander pcf;
 
 /* ───────────── BLE namespaces ───────────── */
 namespace BleJammer {

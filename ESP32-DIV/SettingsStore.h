@@ -15,8 +15,13 @@ struct AppSettings {
 
   bool     neopixelEnabled = false;
 
+#if defined(BOARD_HIWONDER_ESP32_S3)
+  bool     autoWifiScan    = false;
+  bool     autoBleScan     = false;
+#else
   bool     autoWifiScan    = true;
   bool     autoBleScan     = true;
+#endif
 
   uint16_t touchXMin = TOUCH_X_MIN;
   uint16_t touchXMax = TOUCH_X_MAX;

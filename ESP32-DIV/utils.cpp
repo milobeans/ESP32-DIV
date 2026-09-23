@@ -5,6 +5,7 @@
 #include <vector>
 #include "driver/gpio.h"
 #include "Touchscreen.h"
+#include "HiwonderBoard.h"
 #include "config.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -475,6 +476,9 @@ const float R2 = 100000.0;
 
 float readBatteryVoltage()
 {
+#if BATTERY_ADC_PIN < 0
+  return 0.0f;
+#else
   static bool adcInitialized = false;
 
   if (!adcInitialized)
@@ -495,6 +499,7 @@ float readBatteryVoltage()
   float avgMv = sum / (float)sampleCount;
 
   return (avgMv / 1000.0f) * 2.0f;
+#endif
 }
 
 float readInternalTemperature() {
@@ -504,7 +509,9 @@ float readInternalTemperature() {
 
 void updateSdCardStatus() {
 
-#ifdef SD_CD
+#if defined(BOARD_HIWONDER_ESP32_S3)
+  bool cardDetected = false;
+#elif defined(SD_CD)
   bool cardDetected = !digitalRead(SD_CD);
 #else
   bool cardDetected = true;
@@ -608,6 +615,13 @@ void drawStatusBar(float batteryVoltage, bool forceUpdate, bool bottomSeparator)
 
     tft.fillRect(0, 0, tft.width(), barHeight, UI_LABLE);
 
+#if defined(BOARD_HIWONDER_ESP32_S3)
+    tft.setTextFont(1);
+    tft.setTextSize(1);
+    tft.setTextColor(UI_TEXT, UI_LABLE);
+    tft.setCursor(x, y + 2);
+    tft.print("USB");
+#else
     tft.drawRoundRect(x, y, 22, 10, 2, TFT_WHITE);
     tft.fillRect(x + 22, y + 3, 2, 4, TFT_WHITE);
 
@@ -620,6 +634,7 @@ void drawStatusBar(float batteryVoltage, bool forceUpdate, bool bottomSeparator)
     tft.setTextFont(1);
     tft.setTextSize(1);
     tft.print(String(batteryPercentage) + "%");
+#endif
 
     const int iconW         = 16;
     const int gap           = 3;
@@ -802,7 +817,10 @@ void updateStatusBar() {
   }
 }
 
-#if HAS_PCF8574_BUTTONS
+#if defined(BOARD_HIWONDER_ESP32_S3)
+uint8_t getPcf8574Address() { return HiwonderBoard::buttonsReady() ? 0x20 : 0; }
+bool initPcf8574Buttons() { return HiwonderBoard::begin(); }
+#elif HAS_PCF8574_BUTTONS
 static uint8_t s_pcf8574Addr = 0;
 
 uint8_t getPcf8574Address() {
@@ -855,6 +873,18 @@ bool initPcf8574Buttons() {
 }
 #endif
 
+#if defined(BOARD_HIWONDER_ESP32_S3)
+// No validated SD wiring is enabled. These are also used by scanner logging
+// and shared-SPI cleanup, so guard the bus boundary rather than just the menu.
+void sdRetryMount() {}
+void sdSpiInit() {}
+bool sdMountChipSelect(uint8_t) { return false; }
+void initSDCard() { updateSdCardStatus(); }
+bool isSDCardAvailable() { return false; }
+void holdSdInactiveOnSharedSpi() {}
+void reclaimSharedSpiBus() {}
+void restoreSdAfterSharedSpi() {}
+#else
 #if TOUCH_SHARES_TFT_SPI
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
 static SPIClass s_sdSpi(FSPI);
@@ -1201,6 +1231,8 @@ void restoreSdAfterSharedSpi() {
   }
   requestStatusBarRedraw();
 }
+
+#endif
 
 void loading(int frameDelay, uint16_t color, int16_t x, int16_t y, int repeats, bool center) {
   int16_t bitmapWidth = 100;

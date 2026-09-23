@@ -1,3 +1,15 @@
+## Hiwonder ESP32-S3 fork
+
+This branch ports ESP32-DIV v1.7.2 to the Hiwonder ESP32-S3 development board with 16 MB flash and 8 MB octal PSRAM. It uses the ST7789 display, FT6336 capacitive touch, XL9555 buttons/backlight and native USB. The UI uses portrait orientation. External accessories and SD storage are unavailable until an exact supported wiring configuration is added.
+
+Build with `bash tools/hiwonder/build-div.sh --install` using Arduino CLI. The script pins Arduino ESP32 2.0.10 and library versions and produces a complete offset-zero image under `artifacts/`. It never connects to or flashes a device. The Hiwonder firmware workflow performs the same build.
+
+Hardware runtime validation is pending. A successful compile does not confirm screen orientation, touch alignment or every feature. Preserve a verified complete current-device backup before installation.
+
+The optional GhostESP build in the same workflow applies `tools/hiwonder/ghostesp.patch` to upstream commit `33ab49c8f877d1d9db49897baadc612fac88b962` (v2.1.3). The patch and resulting GhostESP work are licensed under GPL-3.0; see `tools/hiwonder/GhostESP-LICENSE`. ESP32-DIV retains its upstream MIT license. The two firmware images are separate programs.
+
+---
+
 <div align="center">
 
   <img src="https://github.com/user-attachments/assets/1f70e8ba-d8be-4889-959a-700294068a3e" alt="ESP32-DIV Banner" width="100%"/>

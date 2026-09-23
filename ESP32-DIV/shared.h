@@ -97,15 +97,34 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
 /*──────────────────── Board Selection ────────────────────*/
 // Default is selected in BoardConfig.h. You can also pass a BOARD_* define
 // from your build flags to target a board without editing source.
-#if !defined(BOARD_ESP32_DIV_V2) && !defined(BOARD_CYD) && !defined(BOARD_ESP32_DIV_V1)
+#if !defined(BOARD_ESP32_DIV_V2) && !defined(BOARD_CYD) && !defined(BOARD_ESP32_DIV_V1) && !defined(BOARD_HIWONDER_ESP32_S3)
 #define BOARD_ESP32_DIV_V2
 #endif
 
-#if (defined(BOARD_ESP32_DIV_V2) + defined(BOARD_CYD) + defined(BOARD_ESP32_DIV_V1)) > 1
+#if (defined(BOARD_ESP32_DIV_V2) + defined(BOARD_CYD) + defined(BOARD_ESP32_DIV_V1) + defined(BOARD_HIWONDER_ESP32_S3)) > 1
 #error "Select only one board: BOARD_ESP32_DIV_V2, BOARD_ESP32_DIV_V1, or BOARD_CYD"
 #endif
 
-#if defined(BOARD_CYD)
+#if defined(BOARD_HIWONDER_ESP32_S3)
+#define ESP32DIV_BOARD_NAME "Hiwonder ESP32-S3"
+#define HAS_PCF8574_BUTTONS 0
+#define HAS_XL9555_BUTTONS 1
+#define BOARD_HAS_ESP32S3 1
+#define FEATURE_BLE_DUCKY 0
+#define FEATURE_SUBGHZ_TOOLS 0
+#define BACKLIGHT_PIN -1
+#define BATTERY_ADC_PIN -1
+#define TOUCH_PROFILE_ID "HIWONDER_FT6336"
+#define TOUCH_X_MIN 0
+#define TOUCH_X_MAX 239
+#define TOUCH_Y_MIN 0
+#define TOUCH_Y_MAX 319
+// Both I2C controllers are reserved for the onboard expander and touch panel.
+#define HIWONDER_EXPANDER_SDA 38
+#define HIWONDER_EXPANDER_SCL 48
+#define HIWONDER_TOUCH_SDA 4
+#define HIWONDER_TOUCH_SCL 5
+#elif defined(BOARD_CYD)
 #ifndef ESP32DIV_BOARD_NAME
 #define ESP32DIV_BOARD_NAME "CYD ESP32-2432S028R"
 #endif
@@ -273,7 +292,14 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
 #endif
 #define PCF8574_ADDR_MIN 0x20
 #define PCF8574_ADDR_MAX 0x27
-#if defined(BOARD_ESP32_DIV_V1)
+#if defined(BOARD_HIWONDER_ESP32_S3)
+// KEY1=up, KEY2=down, KEY3=select, KEY4=back. Right is on screen.
+#define BTN_UP 4
+#define BTN_DOWN 5
+#define BTN_SELECT 6
+#define BTN_LEFT 7
+#define BTN_RIGHT 8
+#elif defined(BOARD_ESP32_DIV_V1)
 #define BTN_UP       6
 #define BTN_DOWN     3
 #define BTN_LEFT     4
@@ -391,7 +417,7 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
 #define SD_SCLK  12
 #endif
 #endif
-#if !defined(BOARD_CYD) && !defined(BOARD_ESP32_DIV_V1) && !defined(SD_CD)
+#if !defined(BOARD_HIWONDER_ESP32_S3) && !defined(BOARD_CYD) && !defined(BOARD_ESP32_DIV_V1) && !defined(SD_CD)
 #define SD_CD    38
 #endif
 #ifndef SD_CS_PIN

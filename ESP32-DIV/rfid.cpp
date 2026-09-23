@@ -1,3 +1,22 @@
+#include "BoardConfig.h"
+#if defined(BOARD_HIWONDER_ESP32_S3)
+#include "shared.h"
+namespace RfidNfc {
+bool begin() { return false; }
+bool hardwareOk() { return false; }
+void resetCloneBuffer() {}
+void clearSessionRetry() {}
+bool consumeSessionRetry() { return false; }
+void sessionCardReader() { feature_exit_requested = true; }
+void sessionClone() { feature_exit_requested = true; }
+void sessionErase() { feature_exit_requested = true; }
+void sessionDump() { feature_exit_requested = true; }
+void sessionDecodeAccess() { feature_exit_requested = true; }
+void sessionJamReader() { feature_exit_requested = true; }
+void sessionDisruptEmulate() { feature_exit_requested = true; }
+void sessionTagDisrupt() { feature_exit_requested = true; }
+}
+#else
 #include "rfid.h"
 
 #include <Adafruit_PN532.h>
@@ -2630,3 +2649,5 @@ void sessionTagDisrupt() {
 }
 
 } // namespace RfidNfc
+
+#endif

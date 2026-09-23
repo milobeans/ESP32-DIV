@@ -1,5 +1,6 @@
 #include <Arduino.h>
-#include <PCF8574.h>
+#include "BoardButtons.h"
+#include "HiwonderBoard.h"
 #include <TFT_eSPI.h>
 #include <Wire.h>
 #include "SettingsStore.h"
@@ -20,13 +21,23 @@
 
 TFT_eSPI tft = TFT_eSPI();
 
-PCF8574 pcf(PCF8574_I2C_ADDR);
+BoardButtonExpander pcf(PCF8574_I2C_ADDR);
 
 void setBrightness(uint8_t value) {
+#if defined(BOARD_HIWONDER_ESP32_S3)
+  HiwonderBoard::setBacklight(value != 0);
+#else
   ledcWrite(PWM_CHANNEL, value);
+#endif
 }
 
 bool feature_exit_requested = false;
+
+#if defined(BOARD_HIWONDER_ESP32_S3)
+// This board has native WiFi/BLE, but none of the DIV accessory radios or SD.
+static void drawHiwonderLauncher();
+static void handleHiwonderLauncher();
+#endif
 
 const int NUM_MENU_ITEMS = 8;
 const char *menu_items[NUM_MENU_ITEMS] = {
@@ -505,7 +516,7 @@ static bool touchButtonInputEnabled = false;
 static bool touchButtonCueDrawn = false;
 static bool s_touchNavLabelsConfigured = false;
 static bool s_touchNavHeld[5] = {false, false, false, false, false};
-#if HAS_PCF8574_BUTTONS
+#if HAS_PCF8574_BUTTONS || HAS_XL9555_BUTTONS
 static bool s_pcfButtonLastState[8] = {true, true, true, true, true, true, true, true};
 #endif
 static FeatureUI::Button s_touchNavBtns[5];
@@ -728,7 +739,7 @@ static bool isTouchNavSlotDown(int idx) {
 }
 
 bool isPhysicalButtonPressed(int buttonPin) {
-#if HAS_PCF8574_BUTTONS
+#if HAS_PCF8574_BUTTONS || HAS_XL9555_BUTTONS
   if (getPcf8574Address() != 0) {
     return !pcf.digitalRead(buttonPin);
   }
@@ -768,7 +779,7 @@ bool isTouchNavButtonPressedEdge(int buttonPin) {
 }
 
 bool isButtonPressedEdge(int buttonPin) {
-#if HAS_PCF8574_BUTTONS
+#if HAS_PCF8574_BUTTONS || HAS_XL9555_BUTTONS
   if (getPcf8574Address() != 0) {
     const int idx = buttonPin % 8;
     const bool cur = pcf.digitalRead(buttonPin);
@@ -846,6 +857,10 @@ static int submenuItemY(int index) {
 }
 
 void displaySubmenu() {
+#if defined(BOARD_HIWONDER_ESP32_S3)
+    drawHiwonderLauncher();
+    return;
+#endif
     setTouchButtonInputEnabled(false);
 
     if (current_menu_index == 2 && other_layer == OTHER_LAYER_HOME) {
@@ -1067,6 +1082,10 @@ static void drawMainMenuOtherTripleIcons(int x_position, int y_position, uint16_
 }
 
 void displayMenu() {
+#if defined(BOARD_HIWONDER_ESP32_S3)
+  drawHiwonderLauncher();
+  return;
+#endif
 
   setTouchButtonInputEnabled(false);
   applyThemeToPalette(settings().theme);
@@ -4344,7 +4363,258 @@ void handleSettingsSubmenuButtons() {
   displayMenu();
 }
 
+#if defined(BOARD_HIWONDER_ESP32_S3)
+struct HiwonderFeature {
+    const char* label;
+    void (*setup)();
+    void (*loop)();
+    void (*exit)();
+};
+
+static const HiwonderFeature hiwonderWifiFeatures[] = {
+    {"Packet Monitor", PacketMonitor::ptmSetup, PacketMonitor::ptmLoop, nullptr},
+    {"Beacon Spammer", BeaconSpammer::beaconSpamSetup, BeaconSpammer::beaconSpamLoop, nullptr},
+    {"WiFi Deauther", Deauther::deautherSetup, Deauther::deautherLoop, nullptr},
+    {"Probe Request Flood", ProbeRequestFlood::probeRequestFloodSetup, ProbeRequestFlood::probeRequestFloodLoop, nullptr},
+    {"Deauth Detector", DeauthDetect::deauthdetectSetup, DeauthDetect::deauthdetectLoop, nullptr},
+    {"WiFi Scanner", WifiScan::wifiscanSetup, WifiScan::wifiscanLoop, nullptr},
+    {"Captive Portal", CaptivePortal::cportalSetup, CaptivePortal::cportalLoop, nullptr},
+    {"Hidden SSID Revealer", HiddenSsidReveal::hiddenSsidSetup, HiddenSsidReveal::hiddenSsidLoop, nullptr},
+    {"WPS Scanner", WpsScanner::wpsScannerSetup, WpsScanner::wpsScannerLoop, nullptr},
+    {"ARP Scanner", ArpScanner::arpScannerSetup, ArpScanner::arpScannerLoop, nullptr},
+    {"Karma Attack", KarmaAttack::karmaSetup, KarmaAttack::karmaLoop, nullptr}
+};
+
+static const HiwonderFeature hiwonderBleFeatures[] = {
+    {"BLE Scanner", BleScan::bleScanSetup, BleScan::bleScanLoop, BleScan::exit},
+    {"AirTag Sniffer", AirTagSniffer::airTagSnifferSetup, AirTagSniffer::airTagSnifferLoop, AirTagSniffer::exit},
+    {"BLE Sniffer", BleSniffer::blesnifferSetup, BleSniffer::blesnifferLoop, BleSniffer::exit},
+    {"Skimmer Detect", BleSkimmer::bleSkimmerSetup, BleSkimmer::bleSkimmerLoop, BleSkimmer::exit},
+    {"BLE Spoofer", BleSpoofer::spooferSetup, BleSpoofer::spooferLoop, BleSpoofer::exit},
+    {"Sour Apple", SourApple::sourappleSetup, SourApple::sourappleLoop, SourApple::exit},
+    {"AirTag Spoofer", AirTagSpoofer::airTagSetup, AirTagSpoofer::airTagLoop, AirTagSpoofer::exit}
+};
+
+static constexpr int HIWONDER_ROWS_PER_PAGE = 7;
+static constexpr int HIWONDER_ROW_Y = 50;
+static constexpr int HIWONDER_ROW_H = 30;
+// 0: home, 1: WiFi, 2: Bluetooth, 3: display, 4: about.
+static int hiwonderMenu = 0;
+static int hiwonderSelection = 0;
+static bool hiwonderTouchHeld = false;
+static uint8_t hiwonderButtonsHeld = 0;
+static bool hiwonderActivateOnRelease = false;
+static bool hiwonderBackOnRelease = false;
+
+static int hiwonderItemCount() {
+    if (hiwonderMenu == 1) {
+        return sizeof(hiwonderWifiFeatures) / sizeof(hiwonderWifiFeatures[0]);
+    }
+    if (hiwonderMenu == 2) {
+        return sizeof(hiwonderBleFeatures) / sizeof(hiwonderBleFeatures[0]);
+    }
+    return (hiwonderMenu == 4) ? 1 : 4;
+}
+
+static const char* hiwonderItemLabel(int index) {
+    static const char* home[] = {"WiFi", "Bluetooth", "Display", "About"};
+    static const char* display[] = {"Dark theme", "Light theme", "Next accent", "Main Menu"};
+    if (hiwonderMenu == 1) return hiwonderWifiFeatures[index].label;
+    if (hiwonderMenu == 2) return hiwonderBleFeatures[index].label;
+    if (hiwonderMenu == 3) return display[index];
+    if (hiwonderMenu == 4) return "Main Menu";
+    return home[index];
+}
+
+static void drawHiwonderLauncher() {
+    setTouchButtonInputEnabled(false);
+    applyThemeToPalette(settings().theme);
+    tft.fillScreen(UI_BG);
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextFont(2);
+    tft.setTextSize(1);
+    tft.setTextColor(UI_TEXT, UI_BG);
+    tft.setCursor(10, 25);
+    const char* titles[] = {"ESP32-DIV / Hiwonder", "WiFi", "Bluetooth", "Display", "About"};
+    tft.print(titles[hiwonderMenu]);
+
+    if (hiwonderMenu == 4) {
+        tft.setCursor(10, 92);
+        tft.println("Hiwonder ESP32-S3");
+        tft.setCursor(10, 118);
+        tft.println("16 MB flash / 8 MB PSRAM");
+        tft.setCursor(10, 144);
+        tft.println("ST7789 / capacitive touch");
+        tft.setCursor(10, 182);
+        tft.println("Native WiFi and BLE tools");
+        tft.setCursor(10, 208);
+        tft.println("No scans run at startup");
+    }
+
+    const int count = hiwonderItemCount();
+    const int first = (hiwonderSelection / HIWONDER_ROWS_PER_PAGE) * HIWONDER_ROWS_PER_PAGE;
+    for (int row = 0; row < HIWONDER_ROWS_PER_PAGE && first + row < count; ++row) {
+        const int index = first + row;
+        const int y = HIWONDER_ROW_Y + row * HIWONDER_ROW_H;
+        const bool selected = index == hiwonderSelection;
+        const uint16_t bg = selected ? UI_FG : UI_BG;
+        tft.fillRoundRect(6, y, tft.width() - 12, HIWONDER_ROW_H - 3, 4, bg);
+        if (selected) tft.drawRoundRect(6, y, tft.width() - 12, HIWONDER_ROW_H - 3, 4, UI_ICON);
+        tft.setTextColor(selected ? UI_ICON : UI_TEXT, bg);
+        tft.setCursor(14, y + 4);
+        tft.print(hiwonderItemLabel(index));
+    }
+
+    const int footerY = tft.height() - 30;
+    tft.drawFastHLine(0, footerY - 3, tft.width(), UI_LINE);
+    tft.setTextColor(UI_TEXT, UI_BG);
+    tft.setCursor(10, footerY + 3);
+    tft.print(hiwonderMenu == 0 ? "Touch or keys" : "Main Menu");
+    if (count > HIWONDER_ROWS_PER_PAGE) {
+        tft.setCursor(tft.width() - 88, footerY + 3);
+        tft.print("Next Page");
+    } else if (hiwonderMenu == 3) {
+        tft.setCursor(tft.width() - 75, footerY + 3);
+        tft.print(accentPresetName(settings().accentColor));
+    }
+    drawStatusBar(currentBatteryVoltage, true);
+}
+
+static void hiwonderReturnHome() {
+    hiwonderMenu = 0;
+    hiwonderSelection = 0;
+    in_sub_menu = false;
+    is_main_menu = false;
+    drawHiwonderLauncher();
+}
+
+static void hiwonderNextPage() {
+    const int next = (hiwonderSelection / HIWONDER_ROWS_PER_PAGE + 1) * HIWONDER_ROWS_PER_PAGE;
+    hiwonderSelection = next < hiwonderItemCount() ? next : 0;
+    drawHiwonderLauncher();
+}
+
+static void runHiwonderFeature(int index, bool bluetooth) {
+    const int count = bluetooth ? sizeof(hiwonderBleFeatures) / sizeof(hiwonderBleFeatures[0])
+                                : sizeof(hiwonderWifiFeatures) / sizeof(hiwonderWifiFeatures[0]);
+    if (index < 0 || index >= count) return;
+    const HiwonderFeature& feature = bluetooth ? hiwonderBleFeatures[index] : hiwonderWifiFeatures[index];
+    feature_active = true;
+    feature_exit_requested = false;
+    in_sub_menu = true;
+    feature.setup();
+    while (!feature_exit_requested) {
+        feature.loop();
+        delay(1);
+    }
+    if (feature.exit) feature.exit();
+    if (!bluetooth) {
+        // Stop the foreground radio before returning to the idle launcher.
+        esp_wifi_set_promiscuous(false);
+        esp_wifi_set_promiscuous_rx_cb(nullptr);
+        esp_wifi_scan_stop();
+        WiFi.scanDelete();
+        WiFi.disconnect(true, false);
+        WiFi.mode(WIFI_OFF);
+    }
+    feature_active = false;
+    feature_exit_requested = false;
+    setTouchButtonInputEnabled(false);
+    // A held Exit must not reopen the item immediately on return.
+    hiwonderButtonsHeld = 0x1F;
+    hiwonderTouchHeld = true;
+    drawHiwonderLauncher();
+}
+
+static void activateHiwonderItem() {
+    if (hiwonderMenu == 0) {
+        hiwonderMenu = hiwonderSelection + 1;
+        hiwonderSelection = 0;
+        in_sub_menu = true;
+    } else if (hiwonderMenu == 1 || hiwonderMenu == 2) {
+        runHiwonderFeature(hiwonderSelection, hiwonderMenu == 2);
+        return;
+    } else if (hiwonderMenu == 3) {
+        if (hiwonderSelection == 0) settings().theme = Theme::Dark;
+        if (hiwonderSelection == 1) settings().theme = Theme::Light;
+        if (hiwonderSelection == 2) settings().accentColor = (settings().accentColor + 1) % ACCENT_PRESET_COUNT;
+        if (hiwonderSelection == 3) {
+            hiwonderReturnHome();
+            return;
+        }
+        setBrightness(settings().brightness);
+    } else {
+        hiwonderReturnHome();
+        return;
+    }
+    drawHiwonderLauncher();
+}
+
+static void handleHiwonderLauncher() {
+    const int pins[] = {BTN_UP, BTN_DOWN, BTN_LEFT, BTN_RIGHT, BTN_SELECT};
+    uint8_t buttons = 0;
+    for (int i = 0; i < 5; ++i) {
+        if (isPhysicalButtonPressed(pins[i])) buttons |= 1 << i;
+    }
+    const uint8_t pressed = buttons & ~hiwonderButtonsHeld;
+    hiwonderButtonsHeld = buttons;
+    int x = 0, y = 0;
+    const bool touched = readTouchXY(x, y);
+    const bool touchPressed = touched && !hiwonderTouchHeld;
+    hiwonderTouchHeld = touched;
+    const int count = hiwonderItemCount();
+
+    if (pressed & 0x01) {
+        hiwonderSelection = (hiwonderSelection + count - 1) % count;
+        drawHiwonderLauncher();
+    } else if (pressed & 0x02) {
+        hiwonderSelection = (hiwonderSelection + 1) % count;
+        drawHiwonderLauncher();
+    } else if ((pressed & 0x04) && hiwonderMenu != 0) {
+        hiwonderBackOnRelease = true;
+    } else if (pressed & 0x10) {
+        hiwonderActivateOnRelease = true;
+    } else if ((pressed & 0x08) && count > HIWONDER_ROWS_PER_PAGE) {
+        hiwonderNextPage();
+    }
+
+    if (touchPressed) {
+        if (y >= tft.height() - 30) {
+            if (x < tft.width() / 2 && hiwonderMenu != 0) {
+                hiwonderBackOnRelease = true;
+            } else if (x >= tft.width() / 2 && count > HIWONDER_ROWS_PER_PAGE) {
+                hiwonderNextPage();
+            }
+        } else if (x >= 6 && x < tft.width() - 6 && y >= HIWONDER_ROW_Y) {
+            const int row = (y - HIWONDER_ROW_Y) / HIWONDER_ROW_H;
+            const int index = (hiwonderSelection / HIWONDER_ROWS_PER_PAGE) * HIWONDER_ROWS_PER_PAGE + row;
+            if (row < HIWONDER_ROWS_PER_PAGE && index < count) {
+                hiwonderSelection = index;
+                hiwonderActivateOnRelease = true;
+                drawHiwonderLauncher();
+            }
+        }
+    }
+
+    if (!buttons && !touched) {
+        if (hiwonderBackOnRelease) {
+            hiwonderBackOnRelease = false;
+            hiwonderActivateOnRelease = false;
+            hiwonderReturnHome();
+        } else if (hiwonderActivateOnRelease) {
+            hiwonderActivateOnRelease = false;
+            activateHiwonderItem();
+        }
+    }
+    if (buttons || touched) last_interaction_time = millis();
+}
+#endif
+
 void handleButtons() {
+#if defined(BOARD_HIWONDER_ESP32_S3)
+    handleHiwonderLauncher();
+    return;
+#endif
     if (in_sub_menu) {
         switch (current_menu_index) {
 
@@ -4514,11 +4784,17 @@ void setup() {
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
 #endif
 
+#if defined(BOARD_HIWONDER_ESP32_S3)
+  HiwonderBoard::begin();
+#endif
   tft.init();
   tft.setRotation(TFT_ROTATION);
-
+#if defined(BOARD_HIWONDER_ESP32_S3)
+  HiwonderBoard::configurePanel();
+#else
   ledcSetup(PWM_CHANNEL, PWM_FREQ, PWM_RESOLUTION);
   ledcAttachPin(BACKLIGHT_PIN, PWM_CHANNEL);
+#endif
   setBrightness(80);
 
   applyThemeToPalette(settings().theme);
@@ -4542,7 +4818,7 @@ void setup() {
   applyThemeToPalette(settings().theme);
   setBrightness(settings().brightness);
 
-#if HAS_PCF8574_BUTTONS
+#if HAS_PCF8574_BUTTONS || HAS_XL9555_BUTTONS
   if (!initPcf8574Buttons()) {
     Serial.println("PCF8574 buttons unavailable");
   }
@@ -4550,7 +4826,7 @@ void setup() {
   Serial.println("PCF8574 buttons disabled for this board");
 #endif
 
-#if BOARD_HAS_ESP32S3
+#if BOARD_HAS_ESP32S3 && !defined(BOARD_HIWONDER_ESP32_S3)
   ensureBleStackReady();
 #else
   // Classic ESP32: defer NimBLE; also skip boot-time WiFi scan task (heap/WDT).
@@ -4561,7 +4837,7 @@ void setup() {
   Ducky::setup();
 #endif
 
-#if BOARD_HAS_ESP32S3
+#if BOARD_HAS_ESP32S3 && !defined(BOARD_HIWONDER_ESP32_S3)
   WifiScan::startBackgroundScanner();
   BleScan::startBackgroundScanner();
   startStatusBarTask();
@@ -4577,6 +4853,13 @@ void setup() {
   setupTouchscreen();
 
   last_interaction_time = millis();
+#if defined(BOARD_HIWONDER_ESP32_S3)
+  Serial.printf("[Hiwonder] ESP32-DIV %s, flash=%u, PSRAM=%u, heap=%u\n",
+                ESP32DIV_VERSION, (unsigned)ESP.getFlashChipSize(),
+                (unsigned)ESP.getPsramSize(), (unsigned)ESP.getFreeHeap());
+  Serial.println("[Hiwonder] KEY1 up, KEY2 down, KEY3 select/exit, KEY4 back");
+  Serial.println("[Hiwonder] SD/GPS/external radios/IR/RFID/audio/RGB disabled; scans are manual");
+#endif
   Serial.println("[boot] ready");
 }
 

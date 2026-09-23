@@ -1,0 +1,57 @@
+name: Hiwonder firmware
+on:
+  push:
+    branches: [hiwonder-esp32-s3]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  esp32-div:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+        with:
+          version: 1.3.1
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.arduino15
+            ~/Arduino/libraries
+          key: arduino-esp32-2.0.10-hiwonder-v1
+      - name: Build Hiwonder ESP32-DIV
+        run: bash tools/hiwonder/build-div.sh --install
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ESP32-DIV-Hiwonder
+          path: artifacts/
+          if-no-files-found: error
+  ghostesp:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: GhostESP-Revival/GhostESP
+          ref: 33ab49c8f877d1d9db49897baadc612fac88b962
+          path: ghostesp
+          submodules: recursive
+      - name: Apply Hiwonder board port
+        working-directory: ghostesp
+        run: git apply ../tools/hiwonder/ghostesp.patch
+      - uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v6.1
+          target: esp32s3
+          path: ghostesp
+          command: bash scripts/build-hiwonder.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GhostESP-Hiwonder
+          path: |
+            ghostesp/build/GhostESP-v2.1.3-Hiwonder.bin
+            ghostesp/build/config/sdkconfig.h
+            ghostesp/build/flasher_args.json
+          if-no-files-found: error

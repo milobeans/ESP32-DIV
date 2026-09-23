@@ -1,7 +1,15 @@
+#include "BoardConfig.h"
+#if defined(BOARD_HIWONDER_ESP32_S3)
+#include "shared.h"
+namespace Ducky {
+void setup() {} void loop() {} void enter() { feature_exit_requested = true; }
+bool active() { return false; } void exit() {}
+}
+#else
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 #include <NimBLEHIDDevice.h>
-#include <PCF8574.h>
+#include "BoardButtons.h"
 #include <SD.h>
 #include <SPI.h>
 #include <TFT_eSPI.h>
@@ -11,7 +19,7 @@
 #include "shared.h"
 #include "utils.h"
 
-extern PCF8574 pcf;
+extern BoardButtonExpander pcf;
 
 extern bool feature_exit_requested;
 
@@ -1474,3 +1482,5 @@ Tap tap = readTap();
 }
 
 }
+
+#endif
