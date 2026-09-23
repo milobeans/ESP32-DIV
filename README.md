@@ -6,6 +6,8 @@ Build with `bash tools/hiwonder/build-div.sh --install` using Arduino CLI. The s
 
 Hardware runtime validation is pending. A successful compile does not confirm screen orientation, touch alignment or every feature. Preserve a verified complete current-device backup before installation.
 
+Run `bash tools/hiwonder/tests/run.sh` for driver boundary checks against the actual board implementation with mock I2C/display interfaces. They cover unrelated-register preservation, bus/read/write failures, button debounce and touch bounds; they do not replace a physical board check.
+
 The optional GhostESP build in the same workflow applies `tools/hiwonder/ghostesp.patch` to upstream commit `33ab49c8f877d1d9db49897baadc612fac88b962` (v2.1.3). The patch and resulting GhostESP work are licensed under GPL-3.0; see `tools/hiwonder/GhostESP-LICENSE`. ESP32-DIV retains its upstream MIT license. The two firmware images are separate programs.
 
 ---

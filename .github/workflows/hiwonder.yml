@@ -16,6 +16,8 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
+      - name: Check Hiwonder driver boundaries
+        run: bash tools/hiwonder/tests/run.sh
       - uses: arduino/setup-arduino-cli@v2
         with:
           version: 1.3.1
