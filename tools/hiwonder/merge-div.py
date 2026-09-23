@@ -36,9 +36,14 @@ image[0x8000:0x8000 + len(partitions)] = partitions
 image[0x10000:] = app
 out = root / 'artifacts' / 'ESP32-DIV-v1.7.2-Hiwonder.bin'
 out.write_bytes(image)
+try:
+    source_commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root,
+                                            text=True, stderr=subprocess.DEVNULL).strip()
+except (OSError, subprocess.CalledProcessError):
+    source_commit = None  # A source archive can build without a Git checkout.
 metadata = {'file': out.name, 'bytes': len(image), 'sha256': hashlib.sha256(image).hexdigest(),
             'offset': 0, 'chip': 'ESP32-S3', 'flash': '16MB', 'psram': '8MB OPI',
-            'source_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip(),
+            'source_commit': source_commit,
             'runtime_verified': False}
 (out.parent / 'build.json').write_text(json.dumps(metadata, indent=2) + '\n')
 print(json.dumps(metadata, indent=2))

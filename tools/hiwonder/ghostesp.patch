@@ -228,7 +228,7 @@ index 7260e20..0c1da6c 100644
              touch_inputs.current_state = LV_INDEV_STATE_REL;
 diff --git a/configs/sdkconfig.hiwonder b/configs/sdkconfig.hiwonder
 new file mode 100644
-index 0000000..3bd2d7a
+index 0000000..4055002
 --- /dev/null
 +++ b/configs/sdkconfig.hiwonder
 @@ -0,0 +1,2897 @@
@@ -636,7 +636,7 @@ index 0000000..3bd2d7a
 +#
 +# Serial Flash Configurations
 +#
-+CONFIG_BOOTLOADER_FLASH_DC_AWARE=y
++# CONFIG_BOOTLOADER_FLASH_DC_AWARE is not set
 +CONFIG_BOOTLOADER_FLASH_XMC_SUPPORT=y
 +# end of Serial Flash Configurations
 +
@@ -2304,13 +2304,13 @@ index 0000000..3bd2d7a
 +#
 +# Features here require specific hardware (READ DOCS FIRST!)
 +#
-+CONFIG_SPI_FLASH_HPM_ENA=y
++# CONFIG_SPI_FLASH_HPM_ENA is not set
 +# CONFIG_SPI_FLASH_HPM_AUTO is not set
-+# CONFIG_SPI_FLASH_HPM_DIS is not set
-+CONFIG_SPI_FLASH_HPM_ON=y
-+CONFIG_SPI_FLASH_HPM_DC_AUTO=y
++CONFIG_SPI_FLASH_HPM_DIS=y
++# CONFIG_SPI_FLASH_HPM_ON is not set
++# CONFIG_SPI_FLASH_HPM_DC_AUTO is not set
 +# CONFIG_SPI_FLASH_HPM_DC_DISABLE is not set
-+CONFIG_SPI_FLASH_HPM_DC_ON=y
++# CONFIG_SPI_FLASH_HPM_DC_ON is not set
 +CONFIG_SPI_FLASH_SUSPEND_QVL_SUPPORTED=y
 +# CONFIG_SPI_FLASH_AUTO_SUSPEND is not set
 +CONFIG_SPI_FLASH_SUSPEND_TSUS_VAL_US=50
@@ -3750,10 +3750,10 @@ index 0000000..95391c1
 +app0, app, factory, 0x10000, 0xF00000,
 diff --git a/scripts/build-hiwonder.sh b/scripts/build-hiwonder.sh
 new file mode 100755
-index 0000000..450be00
+index 0000000..08cca8b
 --- /dev/null
 +++ b/scripts/build-hiwonder.sh
-@@ -0,0 +1,61 @@
+@@ -0,0 +1,76 @@
 +#!/usr/bin/env bash
 +# Build the Hiwonder merged image from this checkout with ESP-IDF v6.1 activated.
 +set -euo pipefail
@@ -3793,17 +3793,32 @@ index 0000000..450be00
 +cmake --build build --parallel "${CMAKE_BUILD_PARALLEL_LEVEL:-4}"
 +python - <<'PY'
 +from pathlib import Path
-+import re,struct
++import json,re,struct
 +cfg = Path('build/config/sdkconfig.h').read_text()
-+for name,value in {'CONFIG_HIWONDER_S3':'1','CONFIG_ESPTOOLPY_FLASHSIZE':'"16MB"','CONFIG_ESPTOOLPY_FLASHMODE':'"dio"','CONFIG_ESPTOOLPY_FLASHFREQ':'"80m"','CONFIG_SPIRAM_MODE_OCT':'1','CONFIG_SPIRAM_SPEED':'80','CONFIG_LV_DISP_SPI_MOSI':'47','CONFIG_LV_DISP_SPI_CLK':'21','CONFIG_LV_DISP_SPI_CS':'2','CONFIG_LV_DISP_PIN_DC':'3','CONFIG_I2C_MANAGER_0_SDA':'38','CONFIG_I2C_MANAGER_0_SCL':'48','CONFIG_I2C_MANAGER_1_SDA':'4','CONFIG_I2C_MANAGER_1_SCL':'5','CONFIG_LV_FT6X36_SWAPXY':'1','CONFIG_LV_FT6X36_INVERT_Y':'1','CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG':'1'}.items():
++for name,value in {'CONFIG_HIWONDER_S3':'1','CONFIG_ESPTOOLPY_FLASHSIZE':'"16MB"','CONFIG_ESPTOOLPY_FLASHMODE':'"dio"','CONFIG_ESPTOOLPY_FLASHMODE_VAL':'3','CONFIG_ESPTOOLPY_FLASHFREQ':'"80m"','CONFIG_SPIRAM_MODE_OCT':'1','CONFIG_SPIRAM_SPEED':'80','CONFIG_LV_DISP_SPI_MOSI':'47','CONFIG_LV_DISP_SPI_CLK':'21','CONFIG_LV_DISP_SPI_CS':'2','CONFIG_LV_DISP_PIN_DC':'3','CONFIG_I2C_MANAGER_0_SDA':'38','CONFIG_I2C_MANAGER_0_SCL':'48','CONFIG_I2C_MANAGER_1_SDA':'4','CONFIG_I2C_MANAGER_1_SCL':'5','CONFIG_LV_FT6X36_SWAPXY':'1','CONFIG_LV_FT6X36_INVERT_Y':'1','CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG':'1','CONFIG_LV_HOR_RES_MAX':'320','CONFIG_LV_VER_RES_MAX':'240','CONFIG_LV_DISPLAY_ORIENTATION':'2','CONFIG_LV_I2C_TOUCH_PORT':'1','CONFIG_LV_COLOR_16_SWAP':'1','CONFIG_LV_DISP_ST7789_SOFT_RESET':'1'}.items():
 +    assert re.search(rf'^#define {name} {re.escape(value)}$',cfg,re.M),f'Wrong resolved config: {name} expected {value}'
-+for name in ('CONFIG_HAS_BADUSB','CONFIG_HAS_BADBLE','CONFIG_USING_SPI','CONFIG_USING_MMC','CONFIG_HAS_GPS','CONFIG_HAS_RTC_CLOCK','CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH'):
++for name in ('CONFIG_HAS_BADUSB','CONFIG_HAS_BADBLE','CONFIG_USING_SPI','CONFIG_USING_MMC','CONFIG_HAS_GPS','CONFIG_HAS_RTC_CLOCK','CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH','CONFIG_BOOTLOADER_FLASH_DC_AWARE','CONFIG_SPI_FLASH_HPM_ON','CONFIG_SPI_FLASH_HPM_DC_ON'):
 +    assert not re.search(rf'^#define {name} 1$',cfg,re.M),f'Unexpected peripheral/storage: {name}'
 +app=Path('build/Ghost_ESP_IDF.bin').read_bytes()
 +assert len(app) <= 0xF00000, 'Application exceeds factory partition'
 +for filename in ('build/Ghost_ESP_IDF.bin','build/bootloader/bootloader.bin'):
 +    b=Path(filename).read_bytes()
 +    assert b[0]==0xE9 and struct.unpack_from('<H',b,12)[0]==9, f'Not an ESP32-S3 image: {filename}'
++    assert b[2] == 2 and b[3] == 0x4F, f'Expected DIO / 16MB / 80MHz header: {filename}, got {b[:4].hex()}'
++flash = json.loads(Path('build/flasher_args.json').read_text())
++assert flash['flash_settings'] == {'flash_mode':'dio','flash_size':'16MB','flash_freq':'80m'}, flash['flash_settings']
++assert flash['flash_files'] == {'0x0':'bootloader/bootloader.bin','0x8000':'partition_table/partition-table.bin','0x10000':'Ghost_ESP_IDF.bin'}, flash['flash_files']
++entries = []
++table = Path('build/partition_table/partition-table.bin').read_bytes()
++for offset in range(0, len(table), 32):
++    entry = table[offset:offset+32]
++    magic = struct.unpack_from('<H',entry)[0]
++    if magic in (0xFFFF,0xEBEB): break
++    assert magic == 0x50AA, f'Invalid partition entry at {offset}'
++    _,kind,subtype,start,size,label,flags = struct.unpack('<HBBII16sI',entry)
++    assert start+size <= 0x1000000 and flags == 0
++    entries.append((kind,subtype,start,size,label.rstrip(b'\0').decode()))
++assert entries == [(1,2,0x9000,0x7000,'nvs'),(0,0,0x10000,0xF00000,'app0')], entries
 +PY
 +python -m esptool --chip esp32s3 merge-bin -o build/GhostESP-v2.1.3-Hiwonder.bin \
 +    0x0 build/bootloader/bootloader.bin \
